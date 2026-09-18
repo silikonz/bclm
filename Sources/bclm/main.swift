@@ -1,21 +1,19 @@
 import ArgumentParser
 import Foundation
 
-#if arch(x86_64)
-    let BCLM_KEY = "BCLM"
-#else
-    let BCLM_KEY = "CHWA"
-#endif
+
+let STATUS_KEY = "bfF0"
+let LL_KEY = "bfE0"
+let HL_KEY = "bfD0" 
 
 struct BCLM: ParsableCommand {
     static let configuration = CommandConfiguration(
-            abstract: "Battery Charge Level Max (BCLM) Utility.",
-            version: "0.1.0",
+            abstract: "Battery Charge Level Max Utility",
             subcommands: [Read.self, Write.self, Persist.self, Unpersist.self])
 
     struct Read: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Reads the BCLM value.")
+            abstract: "Reads the limit status.")
 
         func run() {
             do {
@@ -24,14 +22,10 @@ struct BCLM: ParsableCommand {
                 print(error)
             }
 
-            let key = SMCKit.getKey(BCLM_KEY, type: DataTypes.UInt8)
+            let key = SMCKit.getKey(STATUS_KEY, type: DataTypes.UInt8)
             do {
                 let status = try SMCKit.readData(key).0
-#if arch(x86_64)
                 print(status)
-#else
-                print(status == 1 ? 80 : 100)
-#endif
             } catch {
                 print(error)
             }
@@ -40,7 +34,7 @@ struct BCLM: ParsableCommand {
 
     struct Write: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Writes a BCLM value.")
+            abstract: "Writes a limit value.")
 
 #if arch(x86_64)
         @Argument(help: "The value to set (50-100)")
