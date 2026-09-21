@@ -2,173 +2,91 @@ import ArgumentParser
 import Foundation
 
 
-let STATUS_KEY = "bfF0"
-let LL_KEY = "bfE0"
-let HL_KEY = "bfD0" 
+enum BCLMKey {
+    static let high   = SMCKit.getKey("bfD0", type: DataTypes.UInt32)
+    static let low    = SMCKit.getKey("bfE0", type: DataTypes.UInt32)
+    static let status = SMCKit.getKey("bfF0", type: DataTypes.UInt8)
+}
+
+
+extension SMCKit {
+    static func readUInt32(_ key: SMCKey) throws -> UInt32 {
+        let bytes = try readData(key)
+        return UInt32(fromBytes: (bytes.0, bytes.1, bytes.2, bytes.3))
+    }
+
+    static func readUInt8(_ key: SMCKey) throws -> UInt8 {
+        let bytes = try readData(key)
+        return bytes.0
+    }
+
+    static func writeUInt32(_ key: SMCKey, value: UInt32) throws {
+        var bytes: SMCBytes = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+        let be = value.bigEndian
+        withUnsafeBytes(of: be) { ptr in
+            bytes.0 = ptr[0]
+            bytes.1 = ptr[1]
+            bytes.2 = ptr[2]
+            bytes.3 = ptr[3]
+        }
+        try writeData(key, data: bytes)
+    }
+
+    static func writeUInt8(_ key: SMCKey, value: UInt8) throws {
+        var bytes: SMCBytes = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+        bytes.0 = value
+        try writeData(key, data: bytes)
+    }
+}
+
 
 struct BCLM: ParsableCommand {
     static let configuration = CommandConfiguration(
-            abstract: "Battery Charge Level Max Utility",
-            subcommands: [Read.self, Write.self, Persist.self, Unpersist.self])
+        abstract: "Battery Charge Level Max Utility",
+        subcommands: [Read.self, Write.self]
+    )
 
     struct Read: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Reads the limit status.")
+            abstract: "Reads status and limit values directly"
+        )
 
-        func run() {
-            do {
-                try SMCKit.open()
-            } catch {
-                print(error)
-            }
+        func run() throws {
+            try SMCKit.open()
 
-            let key = SMCKit.getKey(STATUS_KEY, type: DataTypes.UInt8)
-            do {
-                let status = try SMCKit.readData(key).0
-                print(status)
-            } catch {
-                print(error)
-            }
+            let highVal   = try SMCKit.readUInt32(BCLMKey.high)
+            let lowVal    = try SMCKit.readUInt32(BCLMKey.low)
+            let statusVal = try SMCKit.readUInt8(BCLMKey.status)
+
+            print("bfD0 (High): \(highVal)")
+            print("bfE0 (Low): \(lowVal)")
+            print("bfF0 (Status): \(statusVal)")
         }
     }
 
     struct Write: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Writes a limit value.")
+            abstract: "Writes high and low limit values, and optional status value"
+        )
 
-#if arch(x86_64)
-        @Argument(help: "The value to set (50-100)")
-        var value: Int
-#else
-        @Argument(help: "The value to set (80 or 100)")
-        var value: Int
-#endif
+        @Argument(help: "High limit (\"bfD0\", UInt32)")
+        var high: UInt32
 
-        func validate() throws {
-            guard getuid() == 0 else {
-                throw ValidationError("Must run as root.")
+        @Argument(help: "Low limit (\"bfE0\", UInt32)")
+        var low: UInt32
+
+        @Argument(help: "Status (\"bfF0\", UInt8, default: 2)")
+        var status: UInt8 = 2
+
+        func run() throws {
+            try SMCKit.open()
+
+            try SMCKit.writeUInt32(BCLMKey.high, value: high)
+            try SMCKit.writeUInt32(BCLMKey.low, value: low)
+
+            if try SMCKit.readUInt8(BCLMKey.status) != status {
+                try SMCKit.writeUInt8(BCLMKey.status, value: status)
             }
-
-#if arch(x86_64)
-            guard value >= 50 && value <= 100 else {
-                throw ValidationError("Value must be between 50 and 100.")
-            }
-#else
-            guard value == 80 || value == 100 else {
-                throw ValidationError("Value must be either 80 or 100.")
-            }
-#endif
-        }
-
-        func run() {
-            do {
-                try SMCKit.open()
-            } catch {
-                print(error)
-            }
-
-            let bclm_key = SMCKit.getKey(BCLM_KEY, type: DataTypes.UInt8)
-
-#if arch(x86_64)
-            let bfcl_key = SMCKit.getKey("BFCL", type: DataTypes.UInt8)
-
-            let bclm_bytes: SMCBytes = (
-                UInt8(value), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0)
-            )
-
-            let bfcl_bytes: SMCBytes = (
-                UInt8(value - 5), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0)
-            )
-
-            do {
-                try SMCKit.writeData(bclm_key, data: bclm_bytes)
-            } catch {
-                print(error)
-            }
-
-            // USB-C Macs do not have the BFCL key since they don't have the
-            // charging indicator
-            do {
-                try SMCKit.writeData(bfcl_key, data: bfcl_bytes)
-            } catch SMCKit.SMCError.keyNotFound {
-                // Do nothing
-            } catch {
-                print(error)
-            }
-#else
-            let bclm_bytes: SMCBytes = (
-                UInt8(value == 80 ? 1 : 0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0)
-            )
-
-            do {
-                try SMCKit.writeData(bclm_key, data: bclm_bytes)
-            } catch {
-                print(error)
-            }
-#endif
-            if (isPersistent()) {
-                updatePlist(value)
-            }
-        }
-    }
-
-    struct Persist: ParsableCommand {
-        static let configuration = CommandConfiguration(
-            abstract: "Persists bclm on reboot.")
-
-        func validate() throws {
-            guard getuid() == 0 else {
-                throw ValidationError("Must run as root.")
-            }
-        }
-
-        func run() {
-            do {
-                try SMCKit.open()
-            } catch {
-                print(error)
-            }
-
-            let key = SMCKit.getKey(BCLM_KEY, type: DataTypes.UInt8)
-            do {
-                let status = try SMCKit.readData(key).0
-#if arch(x86_64)
-                updatePlist(Int(status))
-#else
-                updatePlist(Int(status) == 1 ? 80 : 100)
-#endif
-            } catch {
-                print(error)
-            }
-
-            persist(true)
-        }
-    }
-
-    struct Unpersist: ParsableCommand {
-        static let configuration = CommandConfiguration(
-            abstract: "Unpersists bclm on reboot.")
-
-        func validate() throws {
-            guard getuid() == 0 else {
-                throw ValidationError("Must run as root.")
-            }
-        }
-
-        func run() {
-            persist(false)
         }
     }
 }
