@@ -10,31 +10,34 @@ enum BCLMKey {
 
 
 extension SMCKit {
-    static func readUInt32(_ key: SMCKey) throws -> UInt32 {
-        let bytes = try readData(key)
-        return UInt32(fromBytes: (bytes.0, bytes.1, bytes.2, bytes.3))
-    }
-
     static func readUInt8(_ key: SMCKey) throws -> UInt8 {
         let bytes = try readData(key)
         return bytes.0
     }
 
+    static func writeUInt8(_ key: SMCKey, value: UInt8) throws {
+        var bytes: SMCBytes = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+        bytes.0 = value
+        try writeData(key, data: bytes)
+    }
+
+    static func readUInt32(_ key: SMCKey) throws -> UInt32 {
+        let bytes = try readData(key)
+        let raw = withUnsafeBytes(of: (bytes.0, bytes.1, bytes.2, bytes.3)) {
+            $0.load(as: UInt32.self)
+        }
+        return UInt32(littleEndian: raw)
+    }
+
     static func writeUInt32(_ key: SMCKey, value: UInt32) throws {
         var bytes: SMCBytes = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-        let be = value.bigEndian
-        withUnsafeBytes(of: be) { ptr in
+        let le = value.littleEndian
+        withUnsafeBytes(of: le) { ptr in
             bytes.0 = ptr[0]
             bytes.1 = ptr[1]
             bytes.2 = ptr[2]
             bytes.3 = ptr[3]
         }
-        try writeData(key, data: bytes)
-    }
-
-    static func writeUInt8(_ key: SMCKey, value: UInt8) throws {
-        var bytes: SMCBytes = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-        bytes.0 = value
         try writeData(key, data: bytes)
     }
 }
