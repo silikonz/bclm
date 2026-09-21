@@ -20,3 +20,4 @@ jobs:
       with:
         name: bclm
         path: /Users/runner/work/bclm/bclm/.build/
+        include-hidden-files: true
