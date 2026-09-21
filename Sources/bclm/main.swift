@@ -74,7 +74,7 @@ struct BCLM: ParsableCommand {
         @Argument(help: "Low limit (\"bfE0\", UInt32)")
         var low: UInt32
 
-        @Argument(help: "Status (\"bfF0\", UInt8, default: 2)")
+        @Argument(help: "Status (\"bfF0\", UInt8)")
         var status: UInt8 = 2
 
         func run() throws {
