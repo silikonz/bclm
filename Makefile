@@ -2,7 +2,7 @@ prefix ?= /usr/local
 bindir = $(prefix)/bin
 
 build:
-	swift build -c release --disable-sandbox --arch arm64
+	swift build -c release --disable-sandbox --arch arm64 --show-bin-path
 	#strip .build/apple/Products/Release/bclm
 
 install: build
