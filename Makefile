@@ -3,7 +3,7 @@ bindir = $(prefix)/bin
 
 build:
 	swift build -c release --disable-sandbox --arch arm64
-	strip .build/apple/Products/Release/bclm
+	#strip .build/apple/Products/Release/bclm
 
 install: build
 	mkdir -p "$(bindir)"
