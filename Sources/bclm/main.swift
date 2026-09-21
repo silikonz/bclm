@@ -31,12 +31,8 @@ extension SMCKit {
 
     static func writeUInt32(_ key: SMCKey, value: UInt32) throws {
         var bytes: SMCBytes = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-        let le = value.littleEndian
-        withUnsafeBytes(of: le) { ptr in
-            bytes.0 = ptr[0]
-            bytes.1 = ptr[1]
-            bytes.2 = ptr[2]
-            bytes.3 = ptr[3]
+        withUnsafeMutableBytes(of: &bytes) { ptr in
+            ptr.storeBytes(of: value.littleEndian, as: UInt32.self)
         }
         try writeData(key, data: bytes)
     }
@@ -83,6 +79,7 @@ struct BCLM: ParsableCommand {
 
         func run() throws {
             try SMCKit.open()
+            defer { SMCKit.close() }
 
             try SMCKit.writeUInt32(BCLMKey.high, value: high)
             try SMCKit.writeUInt32(BCLMKey.low, value: low)
